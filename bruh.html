@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<!--
+Jentacular Gent
+software rasterizer
+-->
+<html oncontextmenu="return false;">
+    <head>
+        <meta charset="utf-8">
+        <title>example</title>
+        <style>
+            body {
+                overflow: hidden;
+                margin: 0px;
+            }
+            canvas {
+                position: absolute;
+                left: -1px;
+                top: -1px;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="canvas" width="400" height="400"></canvas>
+    </body>
+    <script src="lmao.js"></script>
+    <script>
+var ctx = document.getElementById("canvas").getContext("2d");
+var random = this.Math.random, cos = this.Math.cos, sin = this.Math.sin;
+var everything = new Rasterizer(6, 4);
+everything.vertex = function(attributes, varyings) {
+    if(attributes[2] !== -5 && attributes[2] !== 5) {
+        attributes[1] -= 0.5;
+        attributes[2] += 5;
+    }
+    var x = attributes[0] - this.uniforms[7], y = attributes[1] - this.uniforms[8], z = attributes[2] - this.uniforms[9];
+    var c = this.uniforms[10], s = this.uniforms[11];
+    var t = x * c + z * s;
+    z = z * c - x * s;
+    x = t;
+    var c = this.uniforms[12], s = this.uniforms[13];
+    var t = y * c - z * s;
+    z = z * c + y * s;
+    y = t;
+    varyings[1] = x * 25 + 200;
+    varyings[2] = y * 25 + 200;
+    varyings[3] = z;
+    
+    var c = this.uniforms[0], s = this.uniforms[1];
+    var x = attributes[0] - this.uniforms[4], y = attributes[1] - this.uniforms[5], z = attributes[2] - this.uniforms[6];
+    var nx = attributes[3], ny = attributes[4], nz = attributes[5];
+    if(nx * x + ny * y + nz * z > 0) { return; }
+    attributes[0] = x * c + z * s;
+    z = z * c - x * s;
+    x = attributes[0];
+    var c = this.uniforms[2], s = this.uniforms[3];
+    attributes[1] = y * c - z * s;
+    z = z * c + y * s;
+    y = attributes[1];
+    varyings[0] = nx * -this.uniforms[14] + ny * -this.uniforms[15] + nz * -this.uniforms[16];
+    return [x, y, z, z * 0.004];
+};
+var shadowMap = new Float32Array(64e4);
+everything.fragment = function(varyings, x, y) {
+    var shade = varyings[0];
+    if(shade < 0.2) { shade = 0.2; }
+    var x = varyings[1], y = varyings[2], z = varyings[3];
+    if(shade > 0.2 && x < 400 && x > 0 && y < 400 && y > 0 && shadowMap[((x | 0) + (y | 0) * 400) << 2] < z - 0.2) { shade = 0.2; }
+    shade *= 255;
+    return [shade, shade, shade, 255];
+};
+var shadow = new Rasterizer(6, 1);
+shadow.vertex = function(attributes, varyings) {
+    var c = this.uniforms[0], s = this.uniforms[1];
+    if(attributes[2] !== -5 && attributes[2] !== 5) {
+        attributes[1] -= 0.5;
+        attributes[2] += 5;
+    }
+    var x = attributes[0] - this.uniforms[4], y = attributes[1] - this.uniforms[5], z = attributes[2] - this.uniforms[6];
+    attributes[0] = x * c + z * s;
+    z = z * c - x * s;
+    x = attributes[0];
+    var c = this.uniforms[2], s = this.uniforms[3];
+    attributes[1] = y * c - z * s;
+    z = z * c + y * s;
+    y = attributes[1];
+    varyings[0] = z;
+    return [x, y, z, 0.04];
+};
+shadow.fragment = function(varyings, x, y) {
+    return [varyings[0], 0, 0, 255];
+};
+var yaw = 3.14159265358979323, pitch = 0;
+var xCam = 0, yCam = 0, zCam = 5;
+var xShadowCam = -5, yShadowCam = 3, zShadowCam = -5;
+var yawShadow = 0, pitchShadow = 0.78539816339;
+var keys = [];
+var frameCount = 0;
+var mouseIsPressed = false, mouseX = 0, mouseY = 0, pmouseX = 0, pmouseY = 0;
+document.addEventListener("mousedown", function() {
+    mouseIsPressed = true;
+});
+document.addEventListener("mouseup", function() {
+    mouseIsPressed = false;
+});
+document.addEventListener("mousemove", function(e) {
+    mouseX = e.offsetX;
+    mouseY = e.offsetY;
+})
+document.addEventListener("keydown", function(e) {
+    keys[e.key.toLowerCase()] = true;
+});
+document.addEventListener("keyup", function(e) {
+    keys[e.key.toLowerCase()] = false;
+});
+keys.shift = false;
+function constrain(a, b, c) { return Math.max(b, Math.min(a, c)); }
+var draw = function() {
+    frameCount += 1;
+    yawShadow += 0.01;
+    var c = cos(frameCount * 0.01) * 0.01;
+    for(var i = 0; i < shadow.vertices.length - 36; i += 6) {
+        shadow.vertices[i] += c;
+        everything.vertices[i] += c;
+    }
+    if(mouseIsPressed) {
+        yaw -= (mouseX - pmouseX) * 0.01;
+        pitch += (mouseY - pmouseY) * 0.01;
+        pitch = constrain(pitch, -1.57079632679, 1.57079632679);
+    }
+    var spd = 0.1;
+    if(keys.w) {
+        xCam -= sin(yaw) * spd;
+        zCam += cos(yaw) * spd;
+    }
+    if(keys.s) {
+        xCam += sin(yaw) * spd;
+        zCam -= cos(yaw) * spd;
+    }
+    if(keys.d) {
+        xCam += cos(yaw) * spd;
+        zCam += sin(yaw) * spd;
+    }
+    if(keys.a) {
+        xCam -= cos(yaw) * spd;
+        zCam -= sin(yaw) * spd;
+    }
+    if(keys[" "]) { yCam -= spd; }
+    if(keys.shift) { yCam += spd; }
+    shadow.uniforms[0] = cos(yawShadow);
+    shadow.uniforms[1] = sin(yawShadow);
+    shadow.uniforms[2] = cos(pitchShadow);
+    shadow.uniforms[3] = sin(pitchShadow);
+    shadow.uniforms[4] = xShadowCam;
+    shadow.uniforms[5] = yShadowCam;
+    shadow.uniforms[6] = zShadowCam;
+    shadow.renderTo(shadowMap, 400, 400);
+    everything.uniforms[0] = cos(yaw);
+    everything.uniforms[1] = sin(yaw);
+    everything.uniforms[2] = cos(pitch);
+    everything.uniforms[3] = sin(pitch);
+    everything.uniforms[4] = xCam;
+    everything.uniforms[5] = yCam;
+    everything.uniforms[6] = zCam;
+    everything.uniforms[7] = xShadowCam;
+    everything.uniforms[8] = yShadowCam;
+    everything.uniforms[9] = zShadowCam;
+    var x = 0, y = 0, z = 1;
+    var c = cos(-pitchShadow), s = sin(-pitchShadow);
+    var t = y * c - z * s;
+    z = z * c + y * s;
+    y = t;
+    var c = cos(-yawShadow), s = sin(-yawShadow);
+    var t = x * c + z * s;
+    z = z * c - x * s;
+    x = t;
+    xShadowCam = x * 5;
+    zShadowCam = z * 5;
+    everything.uniforms[10] = cos(yawShadow);
+    everything.uniforms[11] = sin(yawShadow);
+    everything.uniforms[12] = cos(pitchShadow);
+    everything.uniforms[13] = sin(pitchShadow);
+    everything.uniforms[14] = x;
+    everything.uniforms[15] = y;
+    everything.uniforms[16] = z;
+    var d = ctx.getImageData(0, 0, 400, 400);
+    d.data = [];
+    for(var i = 0; i < 64e4; i += 4) {
+        d.data[i + 0] = d.data[i + 1] = d.data[i + 2] = 0;
+        d.data[i + 3] = 255;
+    }
+    everything.renderTo(d.data, 400, 400);
+    ctx.putImageData(d, 0, 0);
+    setTimeout(draw, 16);
+    pmouseX = mouseX;
+    pmouseY = mouseY;
+};
+draw();
+    </script>
+    <script src="die no sore.js"></script>
+</html>
