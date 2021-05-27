@@ -75,8 +75,8 @@ Rasterizer.prototype.renderTo = function(out, width, height) {
                 for(var j = 0; j < d; j += 1) {
                     vertices[v + 4 + j] = varyings[j];
                 }
+                v += 4 + d;
             }
-            v += 4 + d;
         }
         if(i >= this.vertices.length) { break; }
         attributes[a] = this.vertices[i];
